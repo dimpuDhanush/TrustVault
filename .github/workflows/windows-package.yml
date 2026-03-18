@@ -16,7 +16,7 @@ permissions:
 
 env:
   JAVA_VERSION: "21"
-  JAVAFX_VERSION: "21.0.2"
+  JAVAFX_VERSION: "21.0.10"
 
 jobs:
   portable:
@@ -37,14 +37,17 @@ jobs:
         shell: pwsh
         run: |
           $version = "${{ env.JAVAFX_VERSION }}"
-          $sdkRoot = Join-Path $env:RUNNER_TEMP "javafx-sdk-$version"
-          if (-not (Test-Path $sdkRoot)) {
-            $zipPath = Join-Path $env:RUNNER_TEMP "openjfx-sdk.zip"
-            $url = "https://download2.gluonhq.com/openjfx/$version/openjfx-$version_windows-x64_bin-sdk.zip"
-            Invoke-WebRequest -Uri $url -OutFile $zipPath
-            Expand-Archive -Path $zipPath -DestinationPath $env:RUNNER_TEMP -Force
+          $extractRoot = Join-Path $env:RUNNER_TEMP "openjfx"
+          $zipPath = Join-Path $env:RUNNER_TEMP "openjfx-sdk.zip"
+          $url = "https://download2.gluonhq.com/openjfx/$version/openjfx-$version_windows-x64_bin-sdk.zip"
+          Remove-Item $extractRoot -Recurse -Force -ErrorAction SilentlyContinue
+          curl.exe -L --fail --retry 5 --retry-delay 2 --output $zipPath $url
+          Expand-Archive -Path $zipPath -DestinationPath $extractRoot -Force
+          $sdkRoot = Get-ChildItem $extractRoot -Directory | Where-Object { $_.Name -like 'javafx-sdk-*' } | Select-Object -First 1
+          if (-not $sdkRoot) {
+            throw "Extracted JavaFX SDK directory not found."
           }
-          "TV_JAVAFX_LIB=$sdkRoot\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "TV_JAVAFX_LIB=$($sdkRoot.FullName)\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build portable package
         shell: pwsh
@@ -78,14 +81,17 @@ jobs:
         shell: pwsh
         run: |
           $version = "${{ env.JAVAFX_VERSION }}"
-          $sdkRoot = Join-Path $env:RUNNER_TEMP "javafx-sdk-$version"
-          if (-not (Test-Path $sdkRoot)) {
-            $zipPath = Join-Path $env:RUNNER_TEMP "openjfx-sdk.zip"
-            $url = "https://download2.gluonhq.com/openjfx/$version/openjfx-$version_windows-x64_bin-sdk.zip"
-            Invoke-WebRequest -Uri $url -OutFile $zipPath
-            Expand-Archive -Path $zipPath -DestinationPath $env:RUNNER_TEMP -Force
+          $extractRoot = Join-Path $env:RUNNER_TEMP "openjfx"
+          $zipPath = Join-Path $env:RUNNER_TEMP "openjfx-sdk.zip"
+          $url = "https://download2.gluonhq.com/openjfx/$version/openjfx-$version_windows-x64_bin-sdk.zip"
+          Remove-Item $extractRoot -Recurse -Force -ErrorAction SilentlyContinue
+          curl.exe -L --fail --retry 5 --retry-delay 2 --output $zipPath $url
+          Expand-Archive -Path $zipPath -DestinationPath $extractRoot -Force
+          $sdkRoot = Get-ChildItem $extractRoot -Directory | Where-Object { $_.Name -like 'javafx-sdk-*' } | Select-Object -First 1
+          if (-not $sdkRoot) {
+            throw "Extracted JavaFX SDK directory not found."
           }
-          "TV_JAVAFX_LIB=$sdkRoot\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "TV_JAVAFX_LIB=$($sdkRoot.FullName)\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Compute version
         id: version
