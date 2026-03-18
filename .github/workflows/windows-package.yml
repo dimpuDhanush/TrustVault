@@ -33,21 +33,19 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
 
-      - name: Download JavaFX SDK
+      - name: Download JavaFX modules
         shell: pwsh
         run: |
           $version = "${{ env.JAVAFX_VERSION }}"
-          $extractRoot = Join-Path $env:RUNNER_TEMP "openjfx"
-          $zipPath = Join-Path $env:RUNNER_TEMP "openjfx-sdk.zip"
-          $url = "https://download2.gluonhq.com/openjfx/$version/openjfx-$version_windows-x64_bin-sdk.zip"
-          Remove-Item $extractRoot -Recurse -Force -ErrorAction SilentlyContinue
-          curl.exe -L --fail --retry 5 --retry-delay 2 --output $zipPath $url
-          Expand-Archive -Path $zipPath -DestinationPath $extractRoot -Force
-          $sdkRoot = Get-ChildItem $extractRoot -Directory | Where-Object { $_.Name -like 'javafx-sdk-*' } | Select-Object -First 1
-          if (-not $sdkRoot) {
-            throw "Extracted JavaFX SDK directory not found."
+          $libDir = Join-Path $env:RUNNER_TEMP "javafx-lib"
+          Remove-Item $libDir -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $libDir | Out-Null
+          foreach ($module in @('base','graphics','controls','fxml')) {
+            $artifact = "javafx-$module-$version-win.jar"
+            $url = "https://repo1.maven.org/maven2/org/openjfx/javafx-$module/$version/$artifact"
+            curl.exe -L --fail --retry 5 --retry-delay 2 --output (Join-Path $libDir $artifact) $url
           }
-          "TV_JAVAFX_LIB=$($sdkRoot.FullName)\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "TV_JAVAFX_LIB=$libDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build portable package
         shell: pwsh
@@ -77,21 +75,19 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
 
-      - name: Download JavaFX SDK
+      - name: Download JavaFX modules
         shell: pwsh
         run: |
           $version = "${{ env.JAVAFX_VERSION }}"
-          $extractRoot = Join-Path $env:RUNNER_TEMP "openjfx"
-          $zipPath = Join-Path $env:RUNNER_TEMP "openjfx-sdk.zip"
-          $url = "https://download2.gluonhq.com/openjfx/$version/openjfx-$version_windows-x64_bin-sdk.zip"
-          Remove-Item $extractRoot -Recurse -Force -ErrorAction SilentlyContinue
-          curl.exe -L --fail --retry 5 --retry-delay 2 --output $zipPath $url
-          Expand-Archive -Path $zipPath -DestinationPath $extractRoot -Force
-          $sdkRoot = Get-ChildItem $extractRoot -Directory | Where-Object { $_.Name -like 'javafx-sdk-*' } | Select-Object -First 1
-          if (-not $sdkRoot) {
-            throw "Extracted JavaFX SDK directory not found."
+          $libDir = Join-Path $env:RUNNER_TEMP "javafx-lib"
+          Remove-Item $libDir -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $libDir | Out-Null
+          foreach ($module in @('base','graphics','controls','fxml')) {
+            $artifact = "javafx-$module-$version-win.jar"
+            $url = "https://repo1.maven.org/maven2/org/openjfx/javafx-$module/$version/$artifact"
+            curl.exe -L --fail --retry 5 --retry-delay 2 --output (Join-Path $libDir $artifact) $url
           }
-          "TV_JAVAFX_LIB=$($sdkRoot.FullName)\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "TV_JAVAFX_LIB=$libDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Compute version
         id: version
@@ -106,24 +102,8 @@ jobs:
           .\scripts\package-windows.ps1 -AppVersion "${{ steps.version.outputs.value }}"
           Copy-Item .\dist\TrustVault-portable.zip $env:RUNNER_TEMP\TrustVault-portable.zip -Force
 
-      - name: Install WiX
-        shell: pwsh
-        run: |
-          choco install wixtoolset --no-progress -y
-          $wixDir = Get-ChildItem "${env:ProgramFiles(x86)}" -Directory | Where-Object { $_.Name -like "WiX Toolset*" } | Sort-Object Name -Descending | Select-Object -First 1
-          if (-not $wixDir) {
-            throw "WiX installation did not produce a bin directory."
-          }
-          (Join-Path $wixDir.FullName "bin") | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-
-      - name: Build installer
-        shell: pwsh
-        run: |
-          .\scripts\package-windows.ps1 -PackageType exe -AppVersion "${{ steps.version.outputs.value }}"
-
       - name: Upload release artifacts
         uses: softprops/action-gh-release@v2
         with:
           files: |
             ${{ runner.temp }}\TrustVault-portable.zip
-            dist\TrustVault-*.exe

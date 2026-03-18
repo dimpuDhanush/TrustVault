@@ -80,3 +80,4 @@ dist\TrustVault-1.0.0.exe
 - The packaged app includes the Java runtime image, so the target machine does not need Java preinstalled.
 - The target machine still needs network access to the MySQL server you configure.
 - If login or startup fails, check the generated logs under the local `logs` directory.
+- GitHub release automation publishes the portable Windows package.

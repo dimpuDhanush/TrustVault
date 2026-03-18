@@ -61,14 +61,14 @@ More details are in [DEPLOYMENT.md](DEPLOYMENT.md).
 The workflow at `.github/workflows/windows-package.yml` does the following:
 
 - on pushes and pull requests to `main`, builds the Windows portable package and uploads it as an artifact
-- on version tags like `v1.0.0`, builds the portable package and Windows installer, then publishes them to GitHub Releases
+- on version tags like `v1.0.0`, builds the portable package and publishes it to GitHub Releases
 
-The workflow at `.github/workflows/deploy-pages.yml` publishes the public project page to GitHub Pages.
+The workflow at `.github/workflows/deploy-pages.yml` publishes the public project page to the `gh-pages` branch.
 
-Expected public site URL:
+Public preview URL:
 
 ```text
-https://dimpudhanush.github.io/TrustVault/
+https://rawcdn.githack.com/dimpuDhanush/TrustVault/gh-pages/index.html
 ```
 
 ## Typical GitHub Setup
