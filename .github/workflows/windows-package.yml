@@ -1,0 +1,123 @@
+name: Windows Package
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  JAVA_VERSION: "21"
+  JAVAFX_VERSION: "21.0.2"
+
+jobs:
+  portable:
+    name: Build Portable Package
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Download JavaFX SDK
+        shell: pwsh
+        run: |
+          $version = "${{ env.JAVAFX_VERSION }}"
+          $sdkRoot = Join-Path $env:RUNNER_TEMP "javafx-sdk-$version"
+          if (-not (Test-Path $sdkRoot)) {
+            $zipPath = Join-Path $env:RUNNER_TEMP "openjfx-sdk.zip"
+            $url = "https://download2.gluonhq.com/openjfx/$version/openjfx-$version_windows-x64_bin-sdk.zip"
+            Invoke-WebRequest -Uri $url -OutFile $zipPath
+            Expand-Archive -Path $zipPath -DestinationPath $env:RUNNER_TEMP -Force
+          }
+          "TV_JAVAFX_LIB=$sdkRoot\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build portable package
+        shell: pwsh
+        run: |
+          .\scripts\package-windows.ps1
+
+      - name: Upload portable artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: trustvault-portable
+          path: |
+            dist/TrustVault-portable.zip
+            dist/TrustVault/**
+
+  release:
+    name: Build Release Assets
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Download JavaFX SDK
+        shell: pwsh
+        run: |
+          $version = "${{ env.JAVAFX_VERSION }}"
+          $sdkRoot = Join-Path $env:RUNNER_TEMP "javafx-sdk-$version"
+          if (-not (Test-Path $sdkRoot)) {
+            $zipPath = Join-Path $env:RUNNER_TEMP "openjfx-sdk.zip"
+            $url = "https://download2.gluonhq.com/openjfx/$version/openjfx-$version_windows-x64_bin-sdk.zip"
+            Invoke-WebRequest -Uri $url -OutFile $zipPath
+            Expand-Archive -Path $zipPath -DestinationPath $env:RUNNER_TEMP -Force
+          }
+          "TV_JAVAFX_LIB=$sdkRoot\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Compute version
+        id: version
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          "value=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Build portable package
+        shell: pwsh
+        run: |
+          .\scripts\package-windows.ps1 -AppVersion "${{ steps.version.outputs.value }}"
+          Copy-Item .\dist\TrustVault-portable.zip $env:RUNNER_TEMP\TrustVault-portable.zip -Force
+
+      - name: Install WiX
+        shell: pwsh
+        run: |
+          choco install wixtoolset --no-progress -y
+          $wixDir = Get-ChildItem "${env:ProgramFiles(x86)}" -Directory | Where-Object { $_.Name -like "WiX Toolset*" } | Sort-Object Name -Descending | Select-Object -First 1
+          if (-not $wixDir) {
+            throw "WiX installation did not produce a bin directory."
+          }
+          (Join-Path $wixDir.FullName "bin") | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          .\scripts\package-windows.ps1 -PackageType exe -AppVersion "${{ steps.version.outputs.value }}"
+
+      - name: Upload release artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ runner.temp }}\TrustVault-portable.zip
+            dist\TrustVault-*.exe
