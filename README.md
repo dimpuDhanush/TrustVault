@@ -63,6 +63,14 @@ The workflow at `.github/workflows/windows-package.yml` does the following:
 - on pushes and pull requests to `main`, builds the Windows portable package and uploads it as an artifact
 - on version tags like `v1.0.0`, builds the portable package and Windows installer, then publishes them to GitHub Releases
 
+The workflow at `.github/workflows/deploy-pages.yml` publishes the public project page to GitHub Pages.
+
+Expected public site URL:
+
+```text
+https://dimpudhanush.github.io/TrustVault/
+```
+
 ## Typical GitHub Setup
 
 After creating a GitHub repository, run:

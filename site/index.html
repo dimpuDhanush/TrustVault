@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrustVault</title>
+    <meta name="description" content="TrustVault is a Windows banking operations desktop app for customer onboarding, accounts, transactions, transfers, statements, audit logs, loans, and deposits.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="page-shell">
+    <header class="topbar">
+        <div class="brand-block">
+            <div class="brand-mark">TV</div>
+            <div>
+                <p class="eyebrow">Banking Operations Suite</p>
+                <h1>TrustVault</h1>
+            </div>
+        </div>
+        <nav class="top-actions">
+            <a href="https://github.com/dimpuDhanush/TrustVault" target="_blank" rel="noreferrer">Repository</a>
+            <a href="https://github.com/dimpuDhanush/TrustVault/releases/latest" target="_blank" rel="noreferrer">Latest Release</a>
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="hero-copy">
+                <p class="eyebrow">Windows Desktop Application</p>
+                <h2>One console for customers, accounts, cash movement, credit, and controls.</h2>
+                <p class="hero-text">
+                    TrustVault is a JavaFX and MySQL banking operations application designed for branch-style workflows:
+                    onboarding, account creation, deposits, withdrawals, transfers, statements, audit trails, loans, and fixed deposits.
+                </p>
+                <div class="cta-row">
+                    <a class="button button-primary" href="https://github.com/dimpuDhanush/TrustVault/releases/latest" target="_blank" rel="noreferrer">Download App</a>
+                    <a class="button button-secondary" href="https://github.com/dimpuDhanush/TrustVault" target="_blank" rel="noreferrer">View Source</a>
+                </div>
+                <p class="footnote">Portable package and installer are published through GitHub Actions releases.</p>
+            </div>
+            <div class="hero-card">
+                <div class="card-glow"></div>
+                <div class="hero-stack">
+                    <div class="metric-card">
+                        <span class="metric-label">Core Areas</span>
+                        <strong>8</strong>
+                        <p>Customers, accounts, transactions, transfers, statements, audit, loans, deposits.</p>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-label">Deployment</span>
+                        <strong>Windows</strong>
+                        <p>Packaged with `jpackage` and delivered as a desktop app, not a browser app.</p>
+                    </div>
+                    <div class="signal-strip">
+                        <span>Java 21</span>
+                        <span>JavaFX</span>
+                        <span>MySQL</span>
+                        <span>GitHub Actions</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-grid">
+            <article class="panel">
+                <p class="eyebrow">What It Handles</p>
+                <h3>Operational coverage without tool-switching.</h3>
+                <ul class="feature-list">
+                    <li>Admin login with password hashing and audit logging.</li>
+                    <li>Customer onboarding and account lifecycle management.</li>
+                    <li>Deposits, withdrawals, and transfer processing.</li>
+                    <li>Statement export for account-level transaction history.</li>
+                    <li>Loan issuance, repayment tracking, and fixed deposit records.</li>
+                </ul>
+            </article>
+
+            <article class="panel accent-panel">
+                <p class="eyebrow">How To Access</p>
+                <h3>Three public entry points.</h3>
+                <div class="link-grid">
+                    <a class="link-card" href="https://github.com/dimpuDhanush/TrustVault" target="_blank" rel="noreferrer">
+                        <span>Source Code</span>
+                        <strong>GitHub Repository</strong>
+                    </a>
+                    <a class="link-card" href="https://github.com/dimpuDhanush/TrustVault/releases/latest" target="_blank" rel="noreferrer">
+                        <span>Desktop Download</span>
+                        <strong>Latest Release</strong>
+                    </a>
+                    <a class="link-card" href="https://github.com/dimpuDhanush/TrustVault/actions" target="_blank" rel="noreferrer">
+                        <span>Build Status</span>
+                        <strong>GitHub Actions</strong>
+                    </a>
+                </div>
+            </article>
+        </section>
+
+        <section class="steps">
+            <div class="section-heading">
+                <p class="eyebrow">Deployment Flow</p>
+                <h3>How the public build is produced.</h3>
+            </div>
+            <div class="step-grid">
+                <article class="step-card">
+                    <span class="step-number">01</span>
+                    <h4>Push to GitHub</h4>
+                    <p>Source changes go to the main repository branch.</p>
+                </article>
+                <article class="step-card">
+                    <span class="step-number">02</span>
+                    <h4>Build on Actions</h4>
+                    <p>GitHub Actions builds the Windows package automatically.</p>
+                </article>
+                <article class="step-card">
+                    <span class="step-number">03</span>
+                    <h4>Publish Release</h4>
+                    <p>Version tags generate downloadable release assets for other users.</p>
+                </article>
+                <article class="step-card">
+                    <span class="step-number">04</span>
+                    <h4>Run with DB Config</h4>
+                    <p>Users update `trustvault.properties` with MySQL connection details.</p>
+                </article>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>TrustVault is a desktop application. This page is the public project and download site.</p>
+        <a href="https://github.com/dimpuDhanush/TrustVault/releases/latest" target="_blank" rel="noreferrer">Open latest release</a>
+    </footer>
+</div>
+</body>
+</html>
