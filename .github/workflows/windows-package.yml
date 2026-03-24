@@ -10,100 +10,96 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      package_type:
+        description: Windows output to generate
+        required: true
+        default: exe
+        type: choice
+        options:
+          - exe
+          - msi
+          - app-image
 
 permissions:
   contents: write
 
 env:
   JAVA_VERSION: "21"
-  JAVAFX_VERSION: "21.0.10"
 
 jobs:
-  portable:
-    name: Build Portable Package
+  package:
+    name: Build Windows Package
     runs-on: windows-latest
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
 
-      - name: Download JavaFX modules
+      - name: Resolve packaging metadata
+        id: meta
         shell: pwsh
         run: |
-          $version = "${{ env.JAVAFX_VERSION }}"
-          $libDir = Join-Path $env:RUNNER_TEMP "javafx-lib"
-          Remove-Item $libDir -Recurse -Force -ErrorAction SilentlyContinue
-          New-Item -ItemType Directory -Path $libDir | Out-Null
-          foreach ($module in @('base','graphics','controls','fxml')) {
-            $artifact = "javafx-$module-$version-win.jar"
-            $url = "https://repo1.maven.org/maven2/org/openjfx/javafx-$module/$version/$artifact"
-            curl.exe -L --fail --retry 5 --retry-delay 2 --output (Join-Path $libDir $artifact) $url
+          [xml]$pom = Get-Content pom.xml
+          $version = if ("${{ github.ref_type }}" -eq "tag") {
+            "${{ github.ref_name }}".TrimStart("v")
+          } else {
+            $pom.project.version
           }
-          "TV_JAVAFX_LIB=$libDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Build portable package
+          $packageType = if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            "${{ inputs.package_type }}"
+          } else {
+            "exe"
+          }
+
+          if ([string]::IsNullOrWhiteSpace($packageType)) {
+            $packageType = "exe"
+          }
+
+          "app_version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "package_type=$packageType" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Install WiX Toolset
+        if: steps.meta.outputs.package_type != 'app-image'
         shell: pwsh
         run: |
-          .\scripts\package-windows.ps1
+          choco install wixtoolset --yes --no-progress
+          $wixDirectory = Get-ChildItem "${env:ProgramFiles(x86)}" -Directory |
+            Where-Object { $_.Name -like "WiX Toolset*" } |
+            Sort-Object Name -Descending |
+            Select-Object -First 1
+          if (-not $wixDirectory) {
+            throw "WiX Toolset installation directory was not found."
+          }
+          (Join-Path $wixDirectory.FullName "bin") | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Upload portable artifacts
-        uses: actions/upload-artifact@v4
+      - name: Build fat JAR and package app
+        shell: pwsh
+        run: |
+          .\scripts\package-windows.ps1 -PackageType "${{ steps.meta.outputs.package_type }}" -AppVersion "${{ steps.meta.outputs.app_version }}"
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v6
         with:
-          name: trustvault-portable
+          name: trustvault-windows-${{ steps.meta.outputs.package_type }}
+          if-no-files-found: warn
           path: |
-            dist/TrustVault-portable.zip
-            dist/TrustVault/**
+            target/*-all.jar
+            dist/app-image/**
+            dist/installer/**
+            dist/runtime/**
 
-  release:
-    name: Build Release Assets
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: windows-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: ${{ env.JAVA_VERSION }}
-
-      - name: Download JavaFX modules
-        shell: pwsh
-        run: |
-          $version = "${{ env.JAVAFX_VERSION }}"
-          $libDir = Join-Path $env:RUNNER_TEMP "javafx-lib"
-          Remove-Item $libDir -Recurse -Force -ErrorAction SilentlyContinue
-          New-Item -ItemType Directory -Path $libDir | Out-Null
-          foreach ($module in @('base','graphics','controls','fxml')) {
-            $artifact = "javafx-$module-$version-win.jar"
-            $url = "https://repo1.maven.org/maven2/org/openjfx/javafx-$module/$version/$artifact"
-            curl.exe -L --fail --retry 5 --retry-delay 2 --output (Join-Path $libDir $artifact) $url
-          }
-          "TV_JAVAFX_LIB=$libDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-      - name: Compute version
-        id: version
-        shell: pwsh
-        run: |
-          $version = "${{ github.ref_name }}".TrimStart("v")
-          "value=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-
-      - name: Build portable package
-        shell: pwsh
-        run: |
-          .\scripts\package-windows.ps1 -AppVersion "${{ steps.version.outputs.value }}"
-          Copy-Item .\dist\TrustVault-portable.zip $env:RUNNER_TEMP\TrustVault-portable.zip -Force
-
-      - name: Upload release artifacts
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            ${{ runner.temp }}\TrustVault-portable.zip
+            dist/installer/*

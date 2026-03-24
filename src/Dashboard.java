@@ -27,6 +27,7 @@ import javafx.stage.Stage;
 
 import java.math.BigDecimal;
 import java.text.NumberFormat;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -36,6 +37,11 @@ import java.util.Locale;
 import java.util.Map;
 
 public class Dashboard {
+    private static final BigDecimal LOW_BALANCE_THRESHOLD = new BigDecimal("10000.00");
+    private static final BigDecimal HIGH_VALUE_TRANSACTION_THRESHOLD = new BigDecimal("100000.00");
+    private static final int FD_MATURITY_WINDOW_DAYS = 30;
+    private static final int LOAN_FOLLOW_UP_WINDOW_DAYS = 30;
+
     private final BankingRepository repository = new BankingRepository();
     private final BankingService service = new BankingService();
     private final NumberFormat currencyFormat = NumberFormat.getCurrencyInstance(Locale.of("en", "IN"));
@@ -56,6 +62,14 @@ public class Dashboard {
     private Label accountsMetric;
     private Label balanceMetric;
     private Label transactionsMetric;
+    private TableView<TransactionRow> overviewRecentTable;
+    private MetricCardBinding lowBalanceWatchCard;
+    private MetricCardBinding fdMaturityQueueCard;
+    private MetricCardBinding loanFollowUpCard;
+    private MetricCardBinding highValueMovementCard;
+    private MetricCardBinding activeAccountsCard;
+    private MetricCardBinding outstandingLoanBookCard;
+    private MetricCardBinding activeDepositBookCard;
     private ComboBox<CustomerOption> customerComboBox;
     private ComboBox<String> accountTypeComboBox;
     private TextField initialDepositField;
@@ -236,22 +250,50 @@ public class Dashboard {
         balanceMetric = (Label) balanceMetricCard.getChildren().get(1);
         transactionsMetric = (Label) transactionMetricCard.getChildren().get(1);
 
-        VBox operationsCard = UiTheme.createCard(24, 18);
-        operationsCard.setPrefWidth(560);
-        operationsCard.getChildren().addAll(
-                UiTheme.createSectionTitle("Operational Scope"),
-                UiTheme.createSupportingText("Use the left menu to open each operation. This overview summarizes the banking work handled in the system."),
-                createOverviewSummaryPanel("Customer intake",
-                        "Customer onboarding, contact updates, and directory review."),
-                createOverviewSummaryPanel("Account controls",
-                        "Account opening, lifecycle updates, and account monitoring."),
-                createOverviewSummaryPanel("Cash movement",
-                        "Deposits, withdrawals, beneficiary handling, and transfers."),
-                createOverviewSummaryPanel("Lending and reporting",
-                        "Loans, fixed deposits, statement export, and audit review."));
+        lowBalanceWatchCard = createOverviewMetricBinding("Low Balance Watch", "#b8645d",
+                "Accounts below the watch threshold will appear here.");
+        fdMaturityQueueCard = createOverviewMetricBinding("FD Maturity Queue", "#c4965a",
+                "Deposits approaching maturity will be highlighted here.");
+        loanFollowUpCard = createOverviewMetricBinding("Loan Follow-up", "#8f8578",
+                "Loans needing repayment follow-up will be listed here.");
+        highValueMovementCard = createOverviewMetricBinding("High Value Movement", "#7c6b56",
+                "Large-value transaction activity will surface here.");
+
+        HBox watchlistRow = new HBox(16,
+                lowBalanceWatchCard.card(),
+                fdMaturityQueueCard.card(),
+                loanFollowUpCard.card(),
+                highValueMovementCard.card());
+        watchlistRow.getChildren().forEach(node -> HBox.setHgrow(node, Priority.ALWAYS));
+
+        VBox watchlistSection = UiTheme.createCard(24, 18);
+        watchlistSection.getChildren().addAll(
+                UiTheme.createSectionTitle("Operations Watchlist"),
+                UiTheme.createSupportingText("Prioritize low-balance accounts, maturity events, repayment follow-up, and high-value activity from one screen."),
+                watchlistRow);
+
+        activeAccountsCard = createOverviewMetricBinding("Active Accounts", "#a89a84",
+                "Operational account mix will update here.");
+        outstandingLoanBookCard = createOverviewMetricBinding("Outstanding Loan Book", "#8f8578",
+                "Active credit exposure will be summarized here.");
+        activeDepositBookCard = createOverviewMetricBinding("Active Deposit Book", "#c4965a",
+                "Fixed deposit pipeline visibility will update here.");
+
+        HBox portfolioRow = new HBox(16,
+                activeAccountsCard.card(),
+                outstandingLoanBookCard.card(),
+                activeDepositBookCard.card());
+        portfolioRow.getChildren().forEach(node -> HBox.setHgrow(node, Priority.ALWAYS));
+
+        VBox portfolioSection = UiTheme.createCard(24, 18);
+        portfolioSection.getChildren().addAll(
+                UiTheme.createSectionTitle("Portfolio Signals"),
+                UiTheme.createSupportingText("Give staff a quick view of account mix, live lending exposure, and the current fixed deposit book."),
+                portfolioRow);
 
         TableView<TransactionRow> recentTable = createTransactionTable();
         recentTable.setItems(FXCollections.observableArrayList());
+        overviewRecentTable = recentTable;
 
         VBox recentCard = UiTheme.createCard(24, 16);
         recentCard.getChildren().addAll(
@@ -260,10 +302,7 @@ public class Dashboard {
                 recentTable);
         HBox.setHgrow(recentCard, Priority.ALWAYS);
 
-        HBox lowerSection = new HBox(18, operationsCard, recentCard);
-        HBox.setHgrow(recentCard, Priority.ALWAYS);
-
-        page.getChildren().addAll(metrics, lowerSection);
+        page.getChildren().addAll(metrics, watchlistSection, portfolioSection, recentCard);
         contentHolder.getChildren().setAll(page);
         loadOverviewData(recentTable);
     }
@@ -455,17 +494,9 @@ public class Dashboard {
         return card;
     }
 
-    private VBox createOverviewSummaryPanel(String title, String description) {
-        VBox panel = UiTheme.createSoftPanel();
-
-        Label titleLabel = new Label(title);
-        titleLabel.setFont(Font.font("Georgia", FontWeight.BOLD, 17));
-        titleLabel.setStyle("-fx-text-fill: #f1ede6;");
-
-        panel.getChildren().addAll(
-                titleLabel,
-                UiTheme.createSupportingText(description));
-        return panel;
+    private MetricCardBinding createOverviewMetricBinding(String title, String accentColor, String detail) {
+        VBox card = UiTheme.createMetricCard(title, "0", detail, accentColor);
+        return new MetricCardBinding(card, (Label) card.getChildren().get(1), (Label) card.getChildren().get(3));
     }
 
     private boolean hasAdminPrivileges() {
@@ -809,29 +840,149 @@ public class Dashboard {
         }
 
         UiAsync.run(
-                repository::loadOverviewStats,
-                stats -> {
-                    customersMetric.setText(String.valueOf(stats.customerCount()));
-                    accountsMetric.setText(String.valueOf(stats.accountCount()));
-                    balanceMetric.setText(currencyFormat.format(stats.totalBalance()));
-                    transactionsMetric.setText(String.valueOf(stats.transactionCount()));
-                },
+                this::buildOverviewSnapshot,
+                this::applyOverviewSnapshot,
                 throwable -> {
                 });
     }
 
     private void loadOverviewData(TableView<TransactionRow> recentTable) {
+        overviewRecentTable = recentTable;
         UiAsync.run(
-                () -> new OverviewSnapshot(repository.loadOverviewStats(), mapTransactionRows(repository.loadRecentTransactions())),
-                snapshot -> {
-                    customersMetric.setText(String.valueOf(snapshot.stats().customerCount()));
-                    accountsMetric.setText(String.valueOf(snapshot.stats().accountCount()));
-                    balanceMetric.setText(currencyFormat.format(snapshot.stats().totalBalance()));
-                    transactionsMetric.setText(String.valueOf(snapshot.stats().transactionCount()));
-                    recentTable.setItems(FXCollections.observableArrayList(snapshot.transactions()));
-                },
+                this::buildOverviewSnapshot,
+                this::applyOverviewSnapshot,
                 throwable -> {
                 });
+    }
+
+    private OverviewSnapshot buildOverviewSnapshot() {
+        List<BankingRepository.TransactionData> recentTransactions = repository.loadRecentTransactions();
+        return new OverviewSnapshot(
+                repository.loadOverviewStats(),
+                mapTransactionRows(recentTransactions),
+                buildOverviewSignals(
+                        repository.loadAccounts(),
+                        recentTransactions,
+                        service.loadLoans(),
+                        service.loadFixedDeposits()));
+    }
+
+    private void applyOverviewSnapshot(OverviewSnapshot snapshot) {
+        customersMetric.setText(String.valueOf(snapshot.stats().customerCount()));
+        accountsMetric.setText(String.valueOf(snapshot.stats().accountCount()));
+        balanceMetric.setText(currencyFormat.format(snapshot.stats().totalBalance()));
+        transactionsMetric.setText(String.valueOf(snapshot.stats().transactionCount()));
+
+        OverviewSignals signals = snapshot.signals();
+        setOverviewMetric(lowBalanceWatchCard,
+                String.valueOf(signals.lowBalanceAccounts()),
+                signals.lowBalanceAccounts() == 0
+                        ? "No active accounts are currently below " + currencyFormat.format(LOW_BALANCE_THRESHOLD) + "."
+                        : signals.lowBalanceAccounts() + " active accounts sit below " + currencyFormat.format(LOW_BALANCE_THRESHOLD)
+                        + " with " + currencyFormat.format(signals.lowBalanceExposure()) + " combined balance.");
+        setOverviewMetric(fdMaturityQueueCard,
+                String.valueOf(signals.maturingDeposits()),
+                signals.maturingDeposits() == 0
+                        ? "No active fixed deposits mature within the next " + FD_MATURITY_WINDOW_DAYS + " days."
+                        : signals.maturingDeposits() + " fixed deposits mature within " + FD_MATURITY_WINDOW_DAYS
+                        + " days worth " + currencyFormat.format(signals.maturingDepositValue()) + ".");
+        setOverviewMetric(loanFollowUpCard,
+                String.valueOf(signals.loanFollowUps()),
+                signals.loanFollowUps() == 0
+                        ? "No active loans are pending first-payment follow-up."
+                        : signals.loanFollowUps() + " active loans are older than " + LOAN_FOLLOW_UP_WINDOW_DAYS
+                        + " days with " + currencyFormat.format(signals.loanFollowUpExposure()) + " still outstanding.");
+        setOverviewMetric(highValueMovementCard,
+                String.valueOf(signals.highValueTransactions()),
+                signals.highValueTransactions() == 0
+                        ? "No recent transactions crossed " + currencyFormat.format(HIGH_VALUE_TRANSACTION_THRESHOLD) + "."
+                        : signals.highValueTransactions() + " recent transactions crossed " + currencyFormat.format(HIGH_VALUE_TRANSACTION_THRESHOLD)
+                        + " for " + currencyFormat.format(signals.highValueTransactionVolume()) + " in volume.");
+
+        setOverviewMetric(activeAccountsCard,
+                String.valueOf(signals.activeAccounts()),
+                signals.frozenAccounts() + " frozen and " + signals.closedAccounts()
+                        + " closed accounts currently sit outside routine operations.");
+        setOverviewMetric(outstandingLoanBookCard,
+                currencyFormat.format(signals.outstandingLoanBook()),
+                signals.activeLoans() + " active loans continue to carry live repayment exposure.");
+        setOverviewMetric(activeDepositBookCard,
+                currencyFormat.format(signals.activeDepositBook()),
+                signals.activeDeposits() + " active fixed deposits remain under management.");
+
+        if ("overview".equals(currentSection) && overviewRecentTable != null) {
+            overviewRecentTable.setItems(FXCollections.observableArrayList(snapshot.transactions()));
+        }
+    }
+
+    private OverviewSignals buildOverviewSignals(List<BankingRepository.AccountData> accounts,
+                                                 List<BankingRepository.TransactionData> recentTransactions,
+                                                 List<BankingService.LoanData> loans,
+                                                 List<BankingService.FixedDepositData> fixedDeposits) {
+        LocalDate today = LocalDate.now();
+
+        List<BankingRepository.AccountData> lowBalanceAccounts = accounts.stream()
+                .filter(account -> "ACTIVE".equalsIgnoreCase(account.status())
+                        && account.balance().compareTo(LOW_BALANCE_THRESHOLD) < 0)
+                .toList();
+        long activeAccounts = accounts.stream().filter(account -> "ACTIVE".equalsIgnoreCase(account.status())).count();
+        long frozenAccounts = accounts.stream().filter(account -> "FROZEN".equalsIgnoreCase(account.status())).count();
+        long closedAccounts = accounts.stream().filter(account -> "CLOSED".equalsIgnoreCase(account.status())).count();
+
+        List<BankingService.FixedDepositData> maturingDeposits = fixedDeposits.stream()
+                .filter(fd -> "ACTIVE".equalsIgnoreCase(fd.status())
+                        && !fd.maturityDate().isBefore(today)
+                        && !fd.maturityDate().isAfter(today.plusDays(FD_MATURITY_WINDOW_DAYS)))
+                .toList();
+        List<BankingService.FixedDepositData> activeDeposits = fixedDeposits.stream()
+                .filter(fd -> "ACTIVE".equalsIgnoreCase(fd.status()))
+                .toList();
+
+        List<BankingService.LoanData> followUpLoans = loans.stream()
+                .filter(loan -> "ACTIVE".equalsIgnoreCase(loan.status())
+                        && loan.paidAmount().compareTo(BigDecimal.ZERO) == 0
+                        && loan.createdAt().toLocalDate().isBefore(today.minusDays(LOAN_FOLLOW_UP_WINDOW_DAYS)))
+                .toList();
+        List<BankingService.LoanData> activeLoans = loans.stream()
+                .filter(loan -> "ACTIVE".equalsIgnoreCase(loan.status()))
+                .toList();
+
+        List<BankingRepository.TransactionData> highValueTransactions = recentTransactions.stream()
+                .filter(transaction -> transaction.amount().compareTo(HIGH_VALUE_TRANSACTION_THRESHOLD) >= 0)
+                .toList();
+
+        return new OverviewSignals(
+                lowBalanceAccounts.size(),
+                sumBalances(lowBalanceAccounts.stream().map(BankingRepository.AccountData::balance).toList()),
+                maturingDeposits.size(),
+                sumBalances(maturingDeposits.stream().map(BankingService.FixedDepositData::maturityAmount).toList()),
+                followUpLoans.size(),
+                sumBalances(followUpLoans.stream()
+                        .map(loan -> loan.totalPayable().subtract(loan.paidAmount()).max(BigDecimal.ZERO))
+                        .toList()),
+                highValueTransactions.size(),
+                sumBalances(highValueTransactions.stream().map(BankingRepository.TransactionData::amount).toList()),
+                activeAccounts,
+                frozenAccounts,
+                closedAccounts,
+                activeLoans.size(),
+                sumBalances(activeLoans.stream()
+                        .map(loan -> loan.totalPayable().subtract(loan.paidAmount()).max(BigDecimal.ZERO))
+                        .toList()),
+                activeDeposits.size(),
+                sumBalances(activeDeposits.stream().map(BankingService.FixedDepositData::maturityAmount).toList()));
+    }
+
+    private void setOverviewMetric(MetricCardBinding binding, String value, String detail) {
+        if (binding == null) {
+            return;
+        }
+        binding.valueLabel().setText(value);
+        binding.detailLabel().setText(detail);
+    }
+
+    private BigDecimal sumBalances(List<BigDecimal> amounts) {
+        return amounts.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private void applyCustomerFilter() {
@@ -1007,7 +1158,19 @@ public class Dashboard {
         }
     }
 
-    private record OverviewSnapshot(BankingRepository.OverviewStats stats, List<TransactionRow> transactions) {
+    private record OverviewSnapshot(BankingRepository.OverviewStats stats, List<TransactionRow> transactions,
+                                    OverviewSignals signals) {
+    }
+
+    private record OverviewSignals(long lowBalanceAccounts, BigDecimal lowBalanceExposure, long maturingDeposits,
+                                   BigDecimal maturingDepositValue, long loanFollowUps, BigDecimal loanFollowUpExposure,
+                                   long highValueTransactions, BigDecimal highValueTransactionVolume,
+                                   long activeAccounts, long frozenAccounts, long closedAccounts,
+                                   long activeLoans, BigDecimal outstandingLoanBook,
+                                   long activeDeposits, BigDecimal activeDepositBook) {
+    }
+
+    private record MetricCardBinding(VBox card, Label valueLabel, Label detailLabel) {
     }
 
     public record CustomerOption(int customerId, String displayName) {

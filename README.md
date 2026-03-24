@@ -8,7 +8,8 @@ TrustVault is a JavaFX desktop banking operations application backed by MySQL. I
 - JavaFX
 - MySQL
 - JDBC
-- PowerShell packaging with `jpackage`
+- Maven
+- PowerShell packaging with `jpackage` and optional WiX Toolset
 
 ## Features
 
@@ -25,7 +26,7 @@ TrustVault is a JavaFX desktop banking operations application backed by MySQL. I
 Prerequisites:
 
 - JDK 21
-- JavaFX SDK
+- Maven 3.9+
 - MySQL server with a `trustvault` database
 
 Create a local `trustvault.properties` file:
@@ -36,23 +37,51 @@ db.user=root
 db.password=your-password
 ```
 
-Compile from IntelliJ or use the packaging script below.
+Build the runnable fat JAR:
+
+```powershell
+mvn clean package
+```
+
+Run the app directly from Maven:
+
+```powershell
+mvn javafx:run
+```
+
+Run the packaged fat JAR locally:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run-local.ps1
+```
 
 ## Package Locally
 
 Portable Windows app image:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\package-windows.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\package-windows.ps1 -PackageType app-image
 ```
 
-Installer build:
+Windows `.exe` installer:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\package-windows.ps1 -PackageType exe
 ```
 
-Installer packaging requires WiX Toolset on the machine.
+Windows `.msi` installer:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\package-windows.ps1 -PackageType msi
+```
+
+Installer packaging requires WiX Toolset on the machine. Final outputs are written to:
+
+```text
+dist/app-image/TrustVault/
+dist/installer/
+dist/runtime/TrustVault-runtime/
+```
 
 More details are in [DEPLOYMENT.md](DEPLOYMENT.md).
 
@@ -60,8 +89,8 @@ More details are in [DEPLOYMENT.md](DEPLOYMENT.md).
 
 The workflow at `.github/workflows/windows-package.yml` does the following:
 
-- on pushes and pull requests to `main`, builds the Windows portable package and uploads it as an artifact
-- on version tags like `v1.0.0`, builds the portable package and publishes it to GitHub Releases
+- on pushes and pull requests to `main`, builds the Windows installer package and uploads artifacts
+- on version tags like `v1.0.0`, builds release assets and publishes them to GitHub Releases
 
 The workflow at `.github/workflows/deploy-pages.yml` publishes the public project page to the `gh-pages` branch.
 

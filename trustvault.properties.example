@@ -1,3 +1,11 @@
+# Copy this file to one of these locations:
+#   .\trustvault.properties
+#   .\config\trustvault.properties
+#
+# Or point the app to a custom file with:
+#   -Dtrustvault.config.file=C:\path\to\trustvault.properties
+#   TV_CONFIG_FILE=C:\path\to\trustvault.properties
+
 db.url=jdbc:mysql://localhost:3306/trustvault
 db.user=root
 db.password=change-me
